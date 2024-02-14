@@ -2,6 +2,7 @@ from transformers import GPT2Tokenizer
 import tensorflow as tf
 from datetime import datetime
 from flask import Flask, jsonify, request
+import threading
 
 dt_start = datetime.now()
 print(f"{dt_start.strftime('%H:%M:%S %m/%d/%y')}: Application started")
@@ -25,30 +26,28 @@ dt_init = datetime.now()
 print(f"{dt_init.strftime('%H:%M:%S %m/%d/%y')}: Initialization finished")
 print(f"{(dt_init - dt_start).seconds} seconds elapsed")
 
-# while True:
-#     dt_startAI = datetime.now()
-#     inp = input(f"{dt_startAI.strftime('%H:%M:%S %m/%d/%y')}: Input article: ")
-#     inputs = tokenizer(inp, return_tensors='tf', max_length=512, truncation=True, padding='max_length')
-#     output = model(inputs)
-#     dt_finishAI = datetime.now()
-#     print(f"{dt_finishAI.strftime('%H:%M:%S %m/%d/%y')}: {predict_news_class(output)}")
-#     print(f"{(dt_finishAI - dt_startAI).seconds} seconds elapsed")
+app = Flask(__name__)
 
-app = Flask(__name__)  # Instantiate your chosen framework
-
-@app.route("/predict" ,methods=['POST', 'GET'])
-def predict():
+def process_request(data):
     try:
-        data = request.get_json()  # Access JSON data sent in the POST request
         article = data['article']
         inputs = tokenizer(article, return_tensors='tf', max_length=512, truncation=True, padding='max_length')
         output = model(inputs)
         prediction = predict_news_class(output)
-        return jsonify({'prediction': prediction})
+        return {'prediction': prediction}
+    except Exception as e:
+        return {'error': str(e)}
 
+@app.route("/predict" ,methods=['POST', 'GET'])
+def predict():
+    try:
+        data = request.get_json()
 
+        thread = threading.Thread(target=process_request, args=(data,))
+        thread.start()
+        return jsonify({'message': 'Processing request'})
     except Exception as e:
         return jsonify({'error': str(e)})
 
 if __name__ == '__main__':
-    app.run('0.0.0.0', port=5000)  #Specify  host and port
+    app.run('0.0.0.0', port=5000)
